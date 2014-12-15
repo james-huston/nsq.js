@@ -8,7 +8,7 @@ describe('Reader', function(){
     utils.deleteTopic('test', function(){
       done();
     });
-  })
+  });
 
   describe('with .nsqd addresses', function(){
     it('should subscribe to messages', function(done){
@@ -28,8 +28,8 @@ describe('Reader', function(){
         msg.finish();
         done();
       });
-    })
-  })
+    });
+  });
 
   describe('with .nsqlookupd addresses', function(){
     it('should subscribe to messages', function(done){
@@ -51,8 +51,8 @@ describe('Reader', function(){
           });
         });
       });
-    })
-  })
+    });
+  });
 
   it('should discard messages after the max attempts', function(done){
     var pub = nsq.writer();
@@ -76,15 +76,15 @@ describe('Reader', function(){
       sub.removeAllListeners('message');
       done();
     });
-  })
-})
+  });
+});
 
 describe('Reader#close()', function(){
   beforeEach(function(done){
     utils.deleteTopic('test', function(){
       done();
     });
-  })
+  });
 
   it('should wait for pending messages and emit "close"', function(done){
     var pub = nsq.writer();
@@ -114,15 +114,54 @@ describe('Reader#close()', function(){
         msg.finish();
       }, 50);
     });
-  })
-})
+  });
+
+  it.only('should not get any more messages after close', function(done) {
+    var pub = nsq.writer();
+    var n = 0;
+    var myTimeout;
+
+    var sub = nsq.reader({
+      topic: 'test',
+      channel: 'reader',
+      nsqlookupd: ['0.0.0.0:4161'],
+      maxInFlight: 10,
+      pollInterval: 100
+    });
+
+    pub.on('ready', function() {
+      pub.publish('test', {n: 1});
+    });
+
+    sub.on('message', function (msg) {
+      n++;
+      msg.finish();
+
+      if (n === 1) {
+        myTimeout = setTimeout(function () {
+          done();
+        }, 1000);
+
+        sub.close(function () {
+          console.log('publish after close');
+          pub.publish('test', {n: 2});
+        });
+      }
+
+      if (n === 2) {
+        clearTimeout(myTimeout);
+        done('kaboom!, we go to many messages');
+      }
+    });
+  });
+});
 
 describe('Reader#close(fn)', function(){
   beforeEach(function(done){
     utils.deleteTopic('test', function(){
       done();
     });
-  })
+  });
 
   it('should wait for pending messages and invoke the callback', function(done){
     var pub = nsq.writer();
@@ -152,7 +191,7 @@ describe('Reader#close(fn)', function(){
         msg.finish();
       }, 50);
     });
-  })
+  });
 
   it('should close if there are no in-flight messages', function(done){
     var pub = nsq.writer();
@@ -171,5 +210,5 @@ describe('Reader#close(fn)', function(){
         sub.close(done);
       }, 100);
     });
-  })
-})
+  });
+});
